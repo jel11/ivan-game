@@ -341,7 +341,7 @@ function update() {
     }
     if (warningTimer <= 0) {
       state = 'ending';
-      endWall.y = -150; endWall.speed = 1.0; endWall.active = true;
+      endWall.y = -(Math.min(W, H) * 0.20); endWall.speed = 1.0; endWall.active = true;
     }
   }
 
@@ -356,9 +356,9 @@ function update() {
     }
     endWall.y += endWall.speed;
     endWall.speed = Math.min(endWall.speed * 1.012, 18);
-    // wall bottom touches player
-    const diceSize = Math.min(W, H) * 0.038;
-    if (endWall.y + diceSize + 14 >= player.y - player.size * 0.9) {
+    // wall bottom touches player (wall height ~30% of screen)
+    const wallH = Math.min(W, H) * 0.30;
+    if (endWall.y + wallH / 2 >= player.y - player.size * 0.9) {
       triggerDeath(); return;
     }
   }
@@ -463,30 +463,86 @@ function draw() {
 }
 
 function drawEndWallVisual() {
-  const ds = Math.min(W, H) * 0.038;
-  const spacing = ds * 2 + 5;
-  const count = Math.ceil(W / spacing) + 2;
-  const wallH = ds * 2 + 22;
+  const wallH = Math.min(W, H) * 0.30;
+  const y = endWall.y;
+  const top = y - wallH / 2;
 
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  ctx.fillRect(0, endWall.y - wallH/2 - 12, W, wallH + 24);
+  ctx.save();
+  // Clip to banner rectangle
+  ctx.beginPath(); ctx.rect(0, top, W, wallH); ctx.clip();
 
-  // red glow lines
-  ctx.strokeStyle = 'rgba(255,20,0,0.7)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, endWall.y - wallH/2 - 12); ctx.lineTo(W, endWall.y - wallH/2 - 12); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, endWall.y + wallH/2 + 12); ctx.lineTo(W, endWall.y + wallH/2 + 12); ctx.stroke();
+  // === B&W sky/water background ===
+  const skyGrad = ctx.createLinearGradient(0, top, 0, top + wallH);
+  skyGrad.addColorStop(0,   '#6a6a6a');
+  skyGrad.addColorStop(0.35,'#999');
+  skyGrad.addColorStop(0.55,'#777');
+  skyGrad.addColorStop(1,   '#2a2a2a');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, top, W, wallH);
 
-  for (let i = 0; i < count; i++) {
-    drawDiceObj(i * spacing + ds, endWall.y, ds, frame * 0.03 + i * 0.15);
+  // Subtle water shimmer lines
+  ctx.strokeStyle = 'rgba(220,220,220,0.12)'; ctx.lineWidth = 1;
+  for (let i = 0; i < 9; i++) {
+    const ly = top + wallH * 0.48 + i * wallH * 0.068;
+    const ww = W * (0.4 + Math.random() * 0.5);
+    const lx = Math.random() * (W - ww);
+    ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + ww, ly); ctx.stroke();
   }
 
-  // "СТРОКА" label on the wall
-  ctx.fillStyle = 'rgba(255,60,0,0.9)';
-  ctx.font = `bold ${Math.min(W*0.055, 28)}px 'Arial Black', Arial`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.shadowBlur = 10; ctx.shadowColor = '#ff2200';
-  ctx.fillText('С Т Р О К А', W/2, endWall.y);
-  ctx.shadowBlur = 0;
+  // Pier floor at bottom
+  const floorGrad = ctx.createLinearGradient(0, top + wallH * 0.6, 0, top + wallH);
+  floorGrad.addColorStop(0, '#3a3a3a'); floorGrad.addColorStop(1, '#111');
+  ctx.fillStyle = floorGrad;
+  ctx.fillRect(0, top + wallH * 0.62, W, wallH * 0.38);
+
+  // Railing post (right side, like in photo)
+  ctx.strokeStyle = '#aaa'; ctx.lineWidth = Math.max(2, wallH * 0.018);
+  ctx.beginPath();
+  ctx.moveTo(W * 0.82, top + wallH * 0.22);
+  ctx.lineTo(W * 0.82, top + wallH * 0.68);
+  ctx.stroke();
+  // Ball on top of post
+  ctx.beginPath(); ctx.arc(W * 0.82, top + wallH * 0.19, wallH * 0.038, 0, Math.PI*2);
+  ctx.fillStyle = '#bbb'; ctx.fill();
+  // Horizontal rail
+  ctx.strokeStyle = '#999'; ctx.lineWidth = Math.max(1.5, wallH * 0.012);
+  ctx.beginPath();
+  ctx.moveTo(W * 0.6, top + wallH * 0.35);
+  ctx.lineTo(W * 0.95, top + wallH * 0.35);
+  ctx.stroke();
+
+  // === Big dark silhouette (centered, slightly left) ===
+  const cx = W * 0.42;
+  const cy = y + wallH * 0.08;
+  const sh = wallH * 0.72; // silhouette height
+  ctx.fillStyle = '#080808';
+  // Hood (large, rounded)
+  ctx.beginPath();
+  ctx.arc(cx, cy - sh * 0.28, sh * 0.26, 0, Math.PI * 2);
+  ctx.fill();
+  // Wide hoodie body
+  ctx.beginPath();
+  ctx.moveTo(cx - sh * 0.38, top + wallH);
+  ctx.quadraticCurveTo(cx - sh * 0.22, cy - sh * 0.04, cx, cy - sh * 0.04);
+  ctx.quadraticCurveTo(cx + sh * 0.22, cy - sh * 0.04, cx + sh * 0.38, top + wallH);
+  ctx.closePath(); ctx.fill();
+
+  // === "Ruben ★" overlay text (bottom-left, like TG profile) ===
+  const textSize = Math.min(wallH * 0.2, 28);
+  ctx.fillStyle = 'rgba(255,255,255,0.96)';
+  ctx.font = `bold ${textSize}px Arial`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+  ctx.fillText('Ruben ★', W * 0.04, top + wallH - wallH * 0.22);
+  ctx.fillStyle = 'rgba(200,200,200,0.75)';
+  ctx.font = `${textSize * 0.68}px Arial`;
+  ctx.fillText('был(а) недавно', W * 0.04, top + wallH - wallH * 0.06);
+
+  ctx.restore();
+
+  // Glowing borders
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, top); ctx.lineTo(W, top); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, top + wallH); ctx.lineTo(W, top + wallH); ctx.stroke();
 }
 
 function drawParticle(p) {
